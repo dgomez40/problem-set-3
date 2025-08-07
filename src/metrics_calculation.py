@@ -9,6 +9,7 @@ PART 2: METRICS CALCULATION
 import numpy as np
 from sklearn.metrics import precision_recall_fscore_support
 import pandas as pd
+import ast
 
 def calculate_metrics(model_pred_df, genre_list, genre_true_counts, genre_tp_counts, genre_fp_counts):
     '''
@@ -39,6 +40,34 @@ def calculate_metrics(model_pred_df, genre_list, genre_true_counts, genre_tp_cou
     '''
 
     # Your code here
+    micro_tp = sum(genre_tp_counts.get(genre, 0) for genre in genre_list)
+    micro_fp = sum(genre_fp_counts.get(genre, 0)for genre in genre_list)
+    micro_fn = sum(genre_true_counts.get(genre, 0) - genre_tp_counts.get(genre, 0) for genre in genre_list)
+
+    
+    micro_precision = micro_tp / (micro_tp + micro_fp) if (micro_tp + micro_fp) != 0 else 0
+    micro_recall = micro_tp / (micro_tp + micro_fn) if (micro_tp + micro_fn) != 0 else 0
+    micro_f1 = 2 * micro_precision * micro_recall / (micro_precision + micro_recall) if (micro_precision + micro_recall) != 0 else 0
+
+
+    macro_prec_list = []
+    macro_recall_list = []
+    macro_f1_list = []
+    for genre in genre_list:
+        macro_tp = genre_tp_counts.get(genre, 0)
+        macro_fp = genre_fp_counts.get(genre, 0)
+        macro_fn = genre_true_counts.get(genre,0) - macro_tp
+
+        macro_precision = macro_tp / (macro_tp + macro_fp) if (macro_tp + macro_fp) != 0 else 0
+        macro_recall = macro_tp / (macro_tp + macro_fn) if (macro_tp + macro_fn) != 0 else 0
+        macro_f1 = 2 * macro_precision * macro_recall / (macro_precision + macro_recall) if (macro_precision + macro_recall) != 0 else 0
+
+        macro_prec_list.append(macro_precision)
+        macro_recall_list.append(macro_recall)
+        macro_f1_list.append(macro_f1)
+
+        return macro_prec_list, macro_recall_list, macro_f1_list, micro_precision, micro_recall, micro_f1
+
 
     
 def calculate_sklearn_metrics(model_pred_df, genre_list):
@@ -62,3 +91,35 @@ def calculate_sklearn_metrics(model_pred_df, genre_list):
     '''
 
     # Your code here
+
+    pred_rows = []
+    true_rows = []
+
+    for _, row in model_pred_df.iterrows():
+        predicted_genres = row['predicted']
+        # print(predicted_genres)
+        
+        #this makes the weird string into a list
+        true_genres = ast.literal_eval(row['actual genres']) if isinstance(row['actual genres'], str) else row['actual genres']        
+        # print(true_genres)
+
+        pred_bool = [1 if row in predicted_genres else 0 for row in genre_list]
+        # print(pred_bool)
+        true_bool = [1 if row in true_genres else 0 for row in genre_list]
+        # print(true_bool)
+
+        pred_rows.append(pred_bool)
+        true_rows.append(true_bool)
+
+    pred_matrix = pd.DataFrame(pred_rows)
+    true_matrix = pd.DataFrame(true_rows)
+
+    micro_prec, micro_recall, micro_f1, _ = precision_recall_fscore_support(true_matrix, pred_matrix, average='micro', zero_division=0)
+    macro_prec_list, macro_recall_list, macro_f1_list, _ = precision_recall_fscore_support(true_matrix, pred_matrix, average='macro', zero_division=0)
+    
+    
+    return micro_prec, micro_recall, micro_f1, macro_prec_list, macro_recall_list, macro_f1_list
+
+
+
+
